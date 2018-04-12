@@ -2,21 +2,12 @@
 <html>
 <head>
 <!--
-	
+
 	https://login.microsoftonline.com/d218a038-fce6-4d24-b555-da29bdb61480/oauth2/authorize?response_type=token&scope=openid&resource=94072ca3-e58d-4bfc-a0c8-63fddd45d15c&client_id=94072ca3-e58d-4bfc-a0c8-63fddd45d15c&redirect_uri=http%3A%2F%2Flocalhost%3A9090%2F&state=1234
 
 	https://login.microsoftonline.com/d218a038-fce6-4d24-b555-da29bdb61480/.well-known/openid-configuration
 
 -->
-<style type="text/css">
-	.row {display: flexbox;}
-	#flash {display:none;top:3em;width:24em;margin-left:auto;margin-right:auto;border-radius:0.25em;border-style:solid;border-radius:1px}
-	.st-err {color:#633;background-color:#ecc;border-color:#633;}
-	.st-warn {color:#553;background-color:#eec;border-color:#633;}
-	.st-ok {color:#363;background-color:#cec;border-color:#633;}
-	.st-info {color:#336;background-color:#cce;border-color:#633;}
-	.st-undefined {color:#444;background-color:#ddd;border-color:#633;}
-</style>
 <script>var session = requireSession({
 			idpAuthorizeUrl: (state)=>("https://login.microsoftonline.com/d218a038-fce6-4d24-b555-da29bdb61480/oauth2/authorize?response_type=token&scope=openid&resource=94072ca3-e58d-4bfc-a0c8-63fddd45d15c&client_id=94072ca3-e58d-4bfc-a0c8-63fddd45d15c&redirect_uri="+encodeURIComponent(location.origin+"/")+"&state="+encodeURIComponent(state))
 		})
@@ -31,7 +22,7 @@
 			if(hasSession()){return getSession()}
 			location = idpAuthorizeUrl(setExpectation())
 			return {}
-			
+
 			function isAuthenticating(hash){
 					return !!hash.access_token
 				}
@@ -73,36 +64,8 @@ function urlToObj(str){
 	}
 </script>
 </head>
-<body>
-	<div id="flash"></div>
-	<h5>Dashboard</h5>
-	<div><form id="editor">
-		<table>
-		<thead>
-			<tr>
-				<th>Outcome Type</th>
-				<th>Feedback Type</th>
-				<th>Feedback Strength</th>
-				<!--<th>Challenge LoE</th>-->
-				<th>Subject</th>
-				<th>Notes</th>
-				<th>&nbsp;</th>
-			</tr>
-		</thead>
-		<tbody id="editor-body">
-		</tbody>
-		</table>
-		<div>
-			<input id="preview" type="button" value="Preview"></input>
-			<input id="submit" type="button" value="Submit"></input>
-		</div>
-	</form></div>
-	<div style="position:relative;top:0:left:0">
-		<div id="btn-edit" style="position:absolute;top:1em;right:1em;display:inline-block;height:2em;width:12em;color:white;background-color:#639;border-radius:0.2em;text-align:center;padding-top:0.75em;">
-			Explain
-		</div>
-		<iframe src="https://meta.looker.com/embed/dashboards/1" style="width:100%;height:24em"></iframe>
-	</div>
+<body color="#333" background="#eee">
+	<div id="app"></div>
 	<datalist id="strength-values">
 	  <option value="0">
   	  <option value="5">
@@ -120,25 +83,65 @@ function urlToObj(str){
 	</datalist>
 </body>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/hyperapp/1.2.5/hyperapp.js" integrity="sha256-EO1vRmcxDsotgvYvFuhhr9KbV3zX4a0uop87FBqNVwo=" crossorigin="anonymous"></script>
 <script>
-var ws = new WebSocket(
+const {h,app} = hyperapp
+const state = {
+	feedback:[{category:"foo",strength:0.5},{category:"bar",strength:0.25}],
+	lookerEmbedReady:false
+}
+const view = (state,actions) => h("div",{},[
+	h("div",{},"Hello"),
+	h("div", {class:"feedback"}, state.feedback.map((feedback,f) =>
+		h("div", {class:"row"},[
+			h("div",{class:"category"},[
+				h("label",{},"Type of Feedback"),
+				h("select",{onchange:evt=>actions.category(f,evt.target.value)},categories({selected:feedback.category}))
+			]),
+			h("div",{class:"strength"},[
+				h("label",{},"Strength of Feedback"),
+				h("input",{type:"range",min:"0",max:"99.9",list:"strength-values",
+						onchange:evt=>actions.strength(f,evt.target.value)
+					})
+			])
+		])
+	)),
+	h("div", {class:"r"},[
+		h("button",{},"Preview")
+	]),
+	h("div", {},[
+		h("iframe",{class:"looker-embed",src:"https://meta.looker.com/embed/dashboards/2676"})
+	])
+])
+const actions = {
+	none: value => state => state,
+	category: (feedbackNumber, value) => state =>({...state}),
+	strength: (feedbackNumber, value) => state =>({...state})
+}
+app(state,actions,view,document.body)
+
+function categories({selected}){ return [
+		h("option",{selected:selected=='adj-safe'||undefined},"Adjust safer"),
+		h("option",{selected:selected=='adj-risk'||undefined},"Adjust riskier"),
+		h("option",{selected:selected=='exp-safe'||undefined},"Explain safety"),
+		h("option",{selected:selected=='exp-risk'||undefined},"Explain risk")
+	]}
+const ws = new WebSocket(
 		`ws://${location.host}/?token=`
 		+encodeURIComponent(session.accessToken)
 	)
 ws.onerror = () => console.error('WebSocket error')
 ws.onopen = () => console.info('WebSocket connection established')
 ws.onclose = () => console.info('WebSocket connection closed')
+//window.addEventListener("hashchange",handleHashState)
+//handleHashState()
 
-
+/*
 $("#editor-body").append(row(1)+row(2)+row(3))
 $("#editor-body").on("click","del",delRow)
 $("#submit").click(()=>wsapi(JSON.stringify({
-		a:0/*,
-		$("#editor tr").map((i,el)=>({
-				$("#")
-			})).get()*/
-	})))
-
+		...})))
+*/
 ws.addEventListener('message', function (event) {
 	var data = tryJsonParse(event.data)
 	if( data && data.msg){
@@ -154,41 +157,57 @@ function wsapi(data){return ws.send(JSON.stringify(data))}
 
 function tryJsonParse(s){try{return JSON.parse(s)}catch(e){return undefined}}
 
-function api(endpoint,data){
+/*function api(endpoint,data){
 		return $.ajax({
 				url:"/"+endpoint,
 				data: data,
 				headers: {
-						Authorization:"Bearer "+localStorage.getItem("access_token")
+						Authorization:"Bearer "+session.accessToken
 					}
 			})
-	}
+	}*/
 
-		
+function handleHashState(){console.warn("TODO")}
+
 function delRow(evt){
 		return $(this.parentNode).remove()
 	}
 function row(number){
-		return `<tr>
-			<td>
+		return `<div class="row feedback-input-group">
+			<div>
 				<select name="cat_${number}">
 					<option val="adj-ren">The customer's likelihood to renew should be lower because of...</option>
 					<option val="adj-non">The customer's likelihood to not-renew should be lower because of...</option>
 					<option val="exp-ren">The customer's likelihood to renew would be explained by...</option>
 					<option val="exp-non">The customer's likelihood to not-renew would be explained by...</option>
 				<select>
-			</td>
-			<td>
+			</div>
+			<div>
 				<input type="range" name="strength_${number}" list="strength-values" value="0"/>
-			</td>
-			<td>
+			</div>
+			<div>
 				<input type="text" name="subject_${number}" />
-			</td>
-			<td>
+			</div>
+			<div>
 				<textarea name="notes_${number}"></textarea>
-			</td>
-			<td> <span class="del">X</span> </td>
-		</tr>`
+			</div>
+			<div> <span class="del">X</span> </div>
+		</div>`
 	}
 </script>
+<style type="text/css">
+	.row {display: flex; flex-direction: row; justify-content: space-around;}
+	label {display:block;font-size:0.6em;font-size:0.6em; color:#666;}
+	.feedback>.row {background-color:#fff;border:1px solid #999;border-radius:0.25em;padding:0.25em 2em;}
+	.feedback>.row>div
+	.feedback input,.feedback select{height:2em;}
+	#flash {display:none;top:3em;width:24em;margin-left:auto;margin-right:auto;border-radius:0.25em;border-style:solid;border-radius:1px}
+	.st-err {color:#633;background-color:#ecc;border-color:#633;}
+	.st-warn {color:#553;background-color:#eec;border-color:#633;}
+	.st-ok {color:#363;background-color:#cec;border-color:#633;}
+	.st-info {color:#336;background-color:#cce;border-color:#633;}
+	.st-undefined {color:#444;background-color:#ddd;border-color:#633;}
+	.r {text-align:right;right:0}
+	.looker-embed{height:36em;width:100%}
+</style>
 </html>
