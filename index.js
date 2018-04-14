@@ -1,6 +1,6 @@
 const promisify = require("promisify-node");
-const express=require('express')
-const path=require('path')
+const express = require('express')
+const path = require('path')
 const _jwt = require('jsonwebtoken')
 const jwt = {
 		verify: promisify(_jwt.verify),
@@ -15,11 +15,11 @@ require('events').EventEmitter.defaultMaxListeners = 15 // Otherwise node warns 
 const pg = require('pg')
 const WebSocketServer = require('ws').Server
 
-const app=express()
+const app = express()
 const config = {
-		port:9090,
+		port:3000,
 		env: process.env.NODE_ENV || "dev",
-		ownUrl:"http://localhost:9090/", //Should be whitelisted by OAuth2 IDP as a redirect URL
+		ownUrl:"http://localhost:3000/", //Should be whitelisted by OAuth2 IDP as a redirect URL
 		idpPublicKeyUrl: "https://login.microsoftonline.com/common/discovery/keys",
 		jwtExpectedAudience: "94072ca3-e58d-4bfc-a0c8-63fddd45d15c", //This should be the Application ID created via Azure AD App registration
 		jwtExpectedIssuer: "https://sts.windows.net/d218a038-fce6-4d24-b555-da29bdb61480/", //This seems to be based on our Azure tenant Id
@@ -47,7 +47,7 @@ const pIdpPublicPemsByKid = fetch(config.idpPublicKeyUrl)
 
 		return;
 
-		
+
 	}()
 
 
@@ -95,4 +95,3 @@ function errorHandler (err, req, res, next) {
 				trace:(cfg.env=='dev' && err.stack ? err.stack.split("\n") : undefined)
 			})
 	}
-

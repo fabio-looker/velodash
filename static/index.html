@@ -64,22 +64,22 @@ function urlToObj(str){
 	}
 </script>
 </head>
-<body color="#333" background="#eee">
+<body style="color:#333;background-color:#eee">
 	<div id="app"></div>
 	<datalist id="strength-values">
-	  <option value="0">
-  	  <option value="5">
-	  <option value="10">
-  	  <option value="15">
-	  <option value="20">
-	  <option value="35">
-	  <option value="50">
-	  <option value="65">
-	  <option value="80">
-	  <option value="85">
-	  <option value="90">
-	  <option value="95">
-	  <option value="99">
+	  <option value="0.0">
+  	  <option value="0.5">
+	  <option value="0.10">
+  	  <option value="0.15">
+	  <option value="0.20">
+	  <option value="0.35">
+	  <option value="0.50">
+	  <option value="0.65">
+	  <option value="0.80">
+	  <option value="0.85">
+	  <option value="0.90">
+	  <option value="0.95">
+	  <option value="0.99">
 	</datalist>
 </body>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
@@ -87,22 +87,48 @@ function urlToObj(str){
 <script>
 const {h,app} = hyperapp
 const state = {
-	feedback:[{category:"foo",strength:0.5},{category:"bar",strength:0.25}],
-	lookerEmbedReady:false
+	feedback:[{category:"adj-safe",strength:0.25},{category:"adj-safe",strength:0}],
+	lookerReady:false,
+	account:"foo"
 }
-const view = (state,actions) => h("div",{},[
-	h("div",{},"Hello"),
-	h("div", {class:"feedback"}, state.feedback.map((feedback,f) =>
+const view = (s,a) =>
+h("div",{},[
+	h("h3",{},"Account Risk-Safety Review"),
+	h("div", {class:"feedback"}, s.feedback.map((feedback,f) =>
 		h("div", {class:"row"},[
 			h("div",{class:"category"},[
 				h("label",{},"Type of Feedback"),
-				h("select",{onchange:evt=>actions.category(f,evt.target.value)},categories({selected:feedback.category}))
+				h("select",feedbackInput(a,s,f,"category"),[
+						option('adj-safe',"Adjust safer",feedback.category),
+						option('adj-risk',"Adjust riskier",feedback.category),
+						option('exp-safe',"Explain safety",feedback.category),
+						option('exp-risk',"Explain risk",feedback.category)
+					])
 			]),
 			h("div",{class:"strength"},[
 				h("label",{},"Strength of Feedback"),
-				h("input",{type:"range",min:"0",max:"99.9",list:"strength-values",
-						onchange:evt=>actions.strength(f,evt.target.value)
-					})
+				h("input",{type:"range",min:"0",max:"0.99",list:"strength-values", ...feedbackInput(a,s,f,"strength")})
+			]),
+			h("div",{class:"subject"},[
+				h("label",{},"Feedback Subject"),
+				h("input",{type:"text", ...feedbackInput(a,s,f,"subject")})
+			]),
+			h("div",{class:"notes"},[
+				h("label",{},"Notes"),
+				h("textarea",feedbackInput(a,s,f,"notes"))
+			]),
+			h("div",{class:"wm12"},[
+				feedback.category=='exp-risk'
+				?	h("div",{class:"loeffort wm12"},[
+						h("label",{},"Level of effort"),
+						h("input",{type:"number",min:"0",max:"99.9", ...feedbackInput(a,s,f,"loeffort")})
+					])
+				:feedback.category=='exp-safe'
+				?	h("div",{class:"strength wm12"},[
+						h("label",{},"Monitor"),
+						h("input",{type:"text", ...feedbackInput(a,s,f,"monitor")})
+					])
+				: ""
 			])
 		])
 	)),
@@ -110,22 +136,63 @@ const view = (state,actions) => h("div",{},[
 		h("button",{},"Preview")
 	]),
 	h("div", {},[
-		h("iframe",{class:"looker-embed",src:"https://meta.looker.com/embed/dashboards/2676"})
+		h("iframe",{
+			id:"looker-account-risk",
+			class:"looker-embed",
+			frameBorder:"0",
+			src:"https://meta.looker.com/embed/dashboards/2676?"+[
+				//"run=1",
+				"embed_domain="+document.location.origin,
+				//"Account=<id%20...>"
+			].join("&")
+		})
 	])
 ])
 const actions = {
 	none: value => state => state,
-	category: (feedbackNumber, value) => state =>({...state}),
-	strength: (feedbackNumber, value) => state =>({...state})
-}
-app(state,actions,view,document.body)
+	//log: value => state => console.log(state),
+	feedback: input => state => (
+			setTimeout(run.pushFilters,0)
+			,{
+				feedback:state.feedback.map((fb,f)=>
+					f==input.dataset.feedbackNumber
+					?{...fb, [input.dataset.feedbackAttribute]:input.value}
+					:fb
+				)
+			}),
+	lookerReady: v => s => (
+			!s.lookerReady && setTimeout(run.pushFilters,0)
+			,{lookerReady:true}
+		),
+	pushFilters: v => s => iframeFilterAndRun("looker-account-risk", s.feedback.reduce((accum,feedback,f)=>({
+			...accum,
+			["feedback_"+(1+f)+"_category"]:feedback.category,
+			["feedback_"+(1+f)+"_strength"]:feedback.strength,
+			["feedback_"+(1+f)+"_loeffort"]:feedback.loeffort
+		}),{
+			Account:" <id: "+s.account+">",
+			loeffort_threshhold:8
+		}))
+	}
+function feedbackInput(actions,state,number,attribute){return {
+			"data-feedback-number":number,
+			"data-feedback-attribute":attribute,
+			value:state.feedback[number][attribute],
+			onchange:evt=>actions.feedback(evt.target)
+		}}
+const run = app(state,actions,view,document.body)
 
-function categories({selected}){ return [
-		h("option",{selected:selected=='adj-safe'||undefined},"Adjust safer"),
-		h("option",{selected:selected=='adj-risk'||undefined},"Adjust riskier"),
-		h("option",{selected:selected=='exp-safe'||undefined},"Explain safety"),
-		h("option",{selected:selected=='exp-risk'||undefined},"Explain risk")
-	]}
+function option(val,label,selected){
+		return h("option",{value:val,selected:selected==val||undefined},label)
+	}
+function iframeFilterAndRun(ifr,filter){
+		console.info("Updating filters:",filter)
+		document.getElementById(ifr).contentWindow.postMessage(JSON.stringify({
+				"type": "dashboard:filters:update",
+				"filters": filter
+			}),"https://meta.looker.com")
+		document.getElementById(ifr).contentWindow.postMessage(JSON.stringify({"type": "dashboard:run"}),"https://meta.looker.com")
+	}
 const ws = new WebSocket(
 		`ws://${location.host}/?token=`
 		+encodeURIComponent(session.accessToken)
@@ -133,15 +200,7 @@ const ws = new WebSocket(
 ws.onerror = () => console.error('WebSocket error')
 ws.onopen = () => console.info('WebSocket connection established')
 ws.onclose = () => console.info('WebSocket connection closed')
-//window.addEventListener("hashchange",handleHashState)
-//handleHashState()
 
-/*
-$("#editor-body").append(row(1)+row(2)+row(3))
-$("#editor-body").on("click","del",delRow)
-$("#submit").click(()=>wsapi(JSON.stringify({
-		...})))
-*/
 ws.addEventListener('message', function (event) {
 	var data = tryJsonParse(event.data)
 	if( data && data.msg){
@@ -152,6 +211,19 @@ ws.addEventListener('message', function (event) {
 		}
 	console.log('WS:', event.data);
 })
+
+window.addEventListener("message",function(event){
+		//In order to receive events from Looker embed frame, you must add a whitelisted embed_domain parameter
+		//to the embed path querystring (not to the SSO querystring).
+		//Always validate the origin of messages before you trust their contents!
+		//if(event.origin!=="https://expected-origin/"){return;}
+		//https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage#Security_concerns
+		//In our case, we will compare it to the host of the last embedded host which we are storing as a data attribute in our dom
+		if(event.origin!=="https://meta.looker.com"){return;}
+		var data = tryJsonParse(event.data)
+		console.log("Top-window message received from "+event.origin,data||event)
+		if(data.type=="dashboard:filters:changed"){run.lookerReady()}
+	})
 
 function wsapi(data){return ws.send(JSON.stringify(data))}
 
@@ -168,39 +240,14 @@ function tryJsonParse(s){try{return JSON.parse(s)}catch(e){return undefined}}
 	}*/
 
 function handleHashState(){console.warn("TODO")}
-
-function delRow(evt){
-		return $(this.parentNode).remove()
-	}
-function row(number){
-		return `<div class="row feedback-input-group">
-			<div>
-				<select name="cat_${number}">
-					<option val="adj-ren">The customer's likelihood to renew should be lower because of...</option>
-					<option val="adj-non">The customer's likelihood to not-renew should be lower because of...</option>
-					<option val="exp-ren">The customer's likelihood to renew would be explained by...</option>
-					<option val="exp-non">The customer's likelihood to not-renew would be explained by...</option>
-				<select>
-			</div>
-			<div>
-				<input type="range" name="strength_${number}" list="strength-values" value="0"/>
-			</div>
-			<div>
-				<input type="text" name="subject_${number}" />
-			</div>
-			<div>
-				<textarea name="notes_${number}"></textarea>
-			</div>
-			<div> <span class="del">X</span> </div>
-		</div>`
-	}
 </script>
 <style type="text/css">
 	.row {display: flex; flex-direction: row; justify-content: space-around;}
 	label {display:block;font-size:0.6em;font-size:0.6em; color:#666;}
-	.feedback>.row {background-color:#fff;border:1px solid #999;border-radius:0.25em;padding:0.25em 2em;}
+	.feedback>.row {background-color:#fff;border:1px solid #999;border-radius:0.25em;padding:0.25em 2em;margin:15px	0;box-shadow: 3px 3px 10px #999;}
 	.feedback>.row>div
 	.feedback input,.feedback select{height:2em;}
+	.feedback textarea {height:3em;width:20em;}
 	#flash {display:none;top:3em;width:24em;margin-left:auto;margin-right:auto;border-radius:0.25em;border-style:solid;border-radius:1px}
 	.st-err {color:#633;background-color:#ecc;border-color:#633;}
 	.st-warn {color:#553;background-color:#eec;border-color:#633;}
@@ -209,5 +256,6 @@ function row(number){
 	.st-undefined {color:#444;background-color:#ddd;border-color:#633;}
 	.r {text-align:right;right:0}
 	.looker-embed{height:36em;width:100%}
+	.wm12 {width:12em;}
 </style>
 </html>
