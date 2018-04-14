@@ -13,7 +13,7 @@
 		})
 	function requireSession({idpAuthorizeUrl,reset, s=localStorage}){
 			if(reset){clearSession()}
-			var hash = urlToObj(window.location.hash)
+			var hash = getHashObj()
 			if(isAuthenticating(hash)){
 					if(isExpected(hash)){setSession(hash)}
 					else{console.warn("Unexpected authorization attempt.")}
@@ -58,9 +58,15 @@
 					return new Date().getTime() < JSON.parse(s.getItem('expires_at'))
 				}
 		}
-function urlToObj(str){
-		return (str.match(/[^?#].+/)||[''])[0].split('&').filter(Boolean).map(ss=>ss.split('='))
-		.reduce((aa,a)=>({[decodeURIComponent(a[0])]:decodeURIComponent(a.slice(1).join('=')), ...aa}),{})
+function getHashObj(){
+		return (location.hash
+				.slice(1)
+				.split('&')
+				.filter(Boolean)
+				.map(ss=>ss.replace(/^\//,"route="))
+				.map(ss=>ss.split('='))
+				.reduce((aa,a)=>({[decodeURIComponent(a[0])]:decodeURIComponent(a.slice(1).join('=')), ...aa}),{})
+			);
 	}
 </script>
 </head>
@@ -87,100 +93,174 @@ function urlToObj(str){
 <script>
 const {h,app} = hyperapp
 const state = {
+	route:"",
+	flash:[],
 	feedback:[{category:"adj-safe",strength:0.25},{category:"adj-safe",strength:0}],
 	lookerReady:false,
 	account:"foo"
 }
 const view = (s,a) =>
 h("div",{},[
-	h("h3",{},"Account Risk-Safety Review"),
-	h("div", {class:"feedback"}, s.feedback.map((feedback,f) =>
-		h("div", {class:"row"},[
-			h("div",{class:"category"},[
-				h("label",{},"Type of Feedback"),
-				h("select",feedbackInput(a,s,f,"category"),[
-						option('adj-safe',"Adjust safer",feedback.category),
-						option('adj-risk',"Adjust riskier",feedback.category),
-						option('exp-safe',"Explain safety",feedback.category),
-						option('exp-risk',"Explain risk",feedback.category)
-					])
-			]),
-			h("div",{class:"strength"},[
-				h("label",{},"Strength of Feedback"),
-				h("input",{type:"range",min:"0",max:"0.99",list:"strength-values", ...feedbackInput(a,s,f,"strength")})
-			]),
-			h("div",{class:"subject"},[
-				h("label",{},"Feedback Subject"),
-				h("input",{type:"text", ...feedbackInput(a,s,f,"subject")})
-			]),
-			h("div",{class:"notes"},[
-				h("label",{},"Notes"),
-				h("textarea",feedbackInput(a,s,f,"notes"))
-			]),
-			h("div",{class:"wm12"},[
-				feedback.category=='exp-risk'
-				?	h("div",{class:"loeffort wm12"},[
-						h("label",{},"Level of effort"),
-						h("input",{type:"number",min:"0",max:"99.9", ...feedbackInput(a,s,f,"loeffort")})
-					])
-				:feedback.category=='exp-safe'
-				?	h("div",{class:"strength wm12"},[
-						h("label",{},"Monitor"),
-						h("input",{type:"text", ...feedbackInput(a,s,f,"monitor")})
-					])
-				: ""
-			])
-		])
-	)),
-	h("div", {class:"r"},[
-		h("button",{},"Preview")
+	h("ul",{id:"flash"},s.flash
+			//.filter(flash=>flash.time>Date.now()-5)
+			.map(flash=>h("li",{class:"st-"+flash.st},flash.msg))
+		),
+	h("div",{id:"breadcrumb"},[
+		h("a",{href:"#/risk-overview"},"Risk Overview")
 	]),
-	h("div", {},[
-		h("iframe",{
-			id:"looker-account-risk",
-			class:"looker-embed",
-			frameBorder:"0",
-			src:"https://meta.looker.com/embed/dashboards/2676?"+[
-				//"run=1",
-				"embed_domain="+document.location.origin,
-				//"Account=<id%20...>"
-			].join("&")
-		})
-	])
+	{
+		"risk-overview":
+			h("div",{id:"route-risk-overview"},[
+				h("a",{href:"#/risk-account&Account=123"},"Account A"),
+				h("a",{href:"#/risk-account&Account=456"},"Account B")
+				/*h("iframe",{
+					id:"risk-overview-embed",
+					class:"looker-embed",
+					frameBorder:"0",
+					src:"https://meta.looker.com/embed/dashboards/...?"+[
+						"embed_domain="+document.location.origin
+						//,"run=1",
+						//,"Account=<id%20...>"
+					].join("&")
+				})*/
+			]),
+		"risk-account":
+			h("div",{id:"risk-account"},[
+				h("h3",{},"Account Risk-Safety Review"),
+				h("div", {class:"feedback"}, s.feedback.map((feedback,f) =>
+					h("div", {class:"row"},[
+						h("div",{class:"category"},[
+							h("label",{},"Type of Feedback"),
+							h("select",feedbackInput(a,s,f,"category"),[
+									option('adj-safe',"Adjust safer",feedback.category),
+									option('adj-risk',"Adjust riskier",feedback.category),
+									option('exp-safe',"Explain safety",feedback.category),
+									option('exp-risk',"Explain risk",feedback.category)
+								])
+						]),
+						h("div",{class:"strength"},[
+							h("label",{},"Strength of Feedback"),
+							h("input",{type:"range",min:"0",max:"0.99",list:"strength-values", ...feedbackInput(a,s,f,"strength")})
+						]),
+						h("div",{class:"subject"},[
+							h("label",{},"Feedback Subject"),
+							h("input",{type:"text", ...feedbackInput(a,s,f,"subject")})
+						]),
+						h("div",{class:"notes"},[
+							h("label",{},"Notes"),
+							h("textarea",feedbackInput(a,s,f,"notes"))
+						]),
+						h("div",{class:"wm12"},[
+							feedback.category=='exp-risk'
+							?	h("div",{class:"loeffort"},[
+									h("label",{},"Level of effort"),
+									h("input",{type:"number",min:"0",max:"99.9", ...feedbackInput(a,s,f,"loeffort")})
+								])
+							: feedback.category=='exp-safe'
+							?	h("div",{class:"strength"},[
+									h("label",{},"Monitor"),
+									h("input",{type:"text", class:"wm12", ...feedbackInput(a,s,f,"monitor")})
+								])
+							: ""
+						])
+					])
+				)),
+				h("div", {},[
+					h("iframe",{
+						id:"risk-account-embed",
+						class:"looker-embed",
+						frameBorder:"0",
+						src:"https://meta.looker.com/embed/dashboards/2676?"+[
+							"embed_domain="+document.location.origin
+							//,"run=1",
+							//,"Account=<id%20...>"
+						].join("&")
+					})
+				]),
+				h("div", {class:"r"},[
+					h("button",{},"Save")
+				])
+			])
+	}[s.route || "risk-overview"]
+	|| h("h3",{},"Invalid URL")
 ])
 const actions = {
-	none: value => state => state,
-	//log: value => state => console.log(state),
-	feedback: input => state => (
-			setTimeout(run.pushFilters,0)
-			,{
-				feedback:state.feedback.map((fb,f)=>
-					f==input.dataset.feedbackNumber
-					?{...fb, [input.dataset.feedbackAttribute]:input.value}
-					:fb
-				)
-			}),
-	lookerReady: v => s => (
-			!s.lookerReady && setTimeout(run.pushFilters,0)
-			,{lookerReady:true}
-		),
-	pushFilters: v => s => iframeFilterAndRun("looker-account-risk", s.feedback.reduce((accum,feedback,f)=>({
-			...accum,
-			["feedback_"+(1+f)+"_category"]:feedback.category,
-			["feedback_"+(1+f)+"_strength"]:feedback.strength,
-			["feedback_"+(1+f)+"_loeffort"]:feedback.loeffort
-		}),{
-			Account:" <id: "+s.account+">",
-			loeffort_threshhold:8
-		}))
+		none: value => state => state,
+		//log: value => state => console.log(state),
+		route: v => s => (
+				s.lookerReady && v.Account != s.Account && setTimeout(run.pushFilters,0)
+				,{
+					route:v.route||s.route,
+					account:v.Account||""
+				}
+			),
+		feedback: input => state => (
+				setTimeout(run.pushFilters,0)
+				,{
+					feedback:state.feedback.map((fb,f)=>
+						f==input.dataset.feedbackNumber
+						?{...fb, [input.dataset.feedbackAttribute]:input.value}
+						:fb
+					)
+				}),
+		lookerReady: v => s => (
+				!s.lookerReady && setTimeout(run.pushFilters,0)
+				,{lookerReady:true}
+			),
+		pushFilters: v => s => iframeFilterAndRun("risk-account-embed", s.feedback.reduce((accum,feedback,f)=>({
+				...accum,
+				["feedback_"+(1+f)+"_category"]:feedback.category,
+				["feedback_"+(1+f)+"_strength"]:feedback.strength,
+				["feedback_"+(1+f)+"_loeffort"]:feedback.loeffort
+			}),{
+				Account:" <id: "+s.account+">",
+				loeffort_threshhold:8
+			})),
+		flash: v => s => (
+				setTimeout(run.none,5000)
+				,{flash:s.flash.slice(-10).concat(v)}
+			)
 	}
+
+const run = app(state,actions,view,document.body)
+run.route(getHashObj())
+
+const ws = new WebSocket(
+		`ws://${location.host}/?token=`
+		+encodeURIComponent(session.accessToken)
+	)
+ws.onerror = () => console.error('WebSocket error')
+ws.onopen = () => console.info('WebSocket connection established')
+ws.onclose = () => console.info('WebSocket connection closed')
+
+window.addEventListener("message",function(event){
+		if(event.origin!=="https://meta.looker.com"){return;}
+		var data = tryJsonParse(event.data)
+		console.log("Top-window message received from "+event.origin,data||event)
+		if(data.type=="dashboard:filters:changed"){run.lookerReady()}
+	})
+ws.addEventListener('message', function (event) {
+		var data = tryJsonParse(event.data)
+		if( data && data.msg){
+				run.flash(data.msg)
+				//$("#flash")
+				//	.removeClass("st-warn st-ok st-err st-info st-undefined")
+				//	.addClass("st-"+data.st)
+				//	.txt(event.data.msg).show().delay(5000).fadeOut(3000)
+			}
+		console.log('WS:', event.data);
+	})
+window.addEventListener('hashchange',function(event){
+		run.route(getHashObj())
+	})
+
 function feedbackInput(actions,state,number,attribute){return {
 			"data-feedback-number":number,
 			"data-feedback-attribute":attribute,
 			value:state.feedback[number][attribute],
 			onchange:evt=>actions.feedback(evt.target)
 		}}
-const run = app(state,actions,view,document.body)
+
 
 function option(val,label,selected){
 		return h("option",{value:val,selected:selected==val||undefined},label)
@@ -193,38 +273,14 @@ function iframeFilterAndRun(ifr,filter){
 			}),"https://meta.looker.com")
 		document.getElementById(ifr).contentWindow.postMessage(JSON.stringify({"type": "dashboard:run"}),"https://meta.looker.com")
 	}
-const ws = new WebSocket(
-		`ws://${location.host}/?token=`
-		+encodeURIComponent(session.accessToken)
-	)
-ws.onerror = () => console.error('WebSocket error')
-ws.onopen = () => console.info('WebSocket connection established')
-ws.onclose = () => console.info('WebSocket connection closed')
 
-ws.addEventListener('message', function (event) {
-	var data = tryJsonParse(event.data)
-	if( data && data.msg){
-			$("#flash")
-				.removeClass("st-warn st-ok st-err st-info st-undefined")
-				.addClass("st-"+data.st)
-				.txt(event.data.msg).show().delay(5000).fadeOut(3000)
-		}
-	console.log('WS:', event.data);
-})
 
-window.addEventListener("message",function(event){
-		//In order to receive events from Looker embed frame, you must add a whitelisted embed_domain parameter
-		//to the embed path querystring (not to the SSO querystring).
-		//Always validate the origin of messages before you trust their contents!
-		//if(event.origin!=="https://expected-origin/"){return;}
-		//https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage#Security_concerns
-		//In our case, we will compare it to the host of the last embedded host which we are storing as a data attribute in our dom
-		if(event.origin!=="https://meta.looker.com"){return;}
-		var data = tryJsonParse(event.data)
-		console.log("Top-window message received from "+event.origin,data||event)
-		if(data.type=="dashboard:filters:changed"){run.lookerReady()}
-	})
 
+
+
+function getHashRoute(){
+		return location.hash.split("&").filter(p=>p[0]=='/')[0]
+	}
 function wsapi(data){return ws.send(JSON.stringify(data))}
 
 function tryJsonParse(s){try{return JSON.parse(s)}catch(e){return undefined}}
