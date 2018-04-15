@@ -31,7 +31,7 @@
 					window.crypto.getRandomValues(arr);
 					var str=''
 					for (var i = 0; i < arr.length; i++) {str+=arr[i].toString(16)}
-					s.setItem("oauthState",str)
+					s.setItem("oauthState",str) //TODO: Save prior hash path to state-keyed localstorage & restore upon callback
 					return str
 				}
 			function isExpected(hash){
@@ -73,19 +73,19 @@ function getHashObj(){
 <body style="color:#333;background-color:#eee">
 	<div id="app"></div>
 	<datalist id="strength-values">
-	  <option value="0.0">
-  	  <option value="0.5">
-	  <option value="0.10">
-  	  <option value="0.15">
-	  <option value="0.20">
-	  <option value="0.35">
-	  <option value="0.50">
-	  <option value="0.65">
-	  <option value="0.80">
-	  <option value="0.85">
-	  <option value="0.90">
-	  <option value="0.95">
-	  <option value="0.99">
+	  <option value="0">
+  	  <option value="5">
+	  <option value="10">
+  	  <option value="15">
+	  <option value="20">
+	  <option value="35">
+	  <option value="50">
+	  <option value="65">
+	  <option value="80">
+	  <option value="85">
+	  <option value="90">
+	  <option value="95">
+	  <option value="99">
 	</datalist>
 </body>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
@@ -96,7 +96,7 @@ const state = {
 	route:"",
 	flash:[],
 	feedback:[{category:"adj-safe",strength:0.25},{category:"adj-safe",strength:0}],
-	lookerReady:false,
+	lookerReady:{},
 	account:"foo"
 }
 const view = (s,a) =>
@@ -108,94 +108,106 @@ h("div",{},[
 	h("div",{id:"breadcrumb"},[
 		h("a",{href:"#/risk-overview"},"Risk Overview")
 	]),
-	{
-		"risk-overview":
-			h("div",{id:"route-risk-overview"},[
-				h("a",{href:"#/risk-account&Account=123"},"Account A"),
-				h("a",{href:"#/risk-account&Account=456"},"Account B")
-				/*h("iframe",{
-					id:"risk-overview-embed",
+	h("div",{class:"frame-display"},[
+		h("div",{id:"route-risk-overview",class:((!s.route||s.route == "risk-overview")?"frame-show":"frame-hide")},[
+			// ^ Because https://github.com/looker/helltool/issues/34763
+			h("a",{href:"#/risk-account&Account=123"},"Account A"),
+			h("a",{href:"#/risk-account&Account=456"},"Account B"),
+			h("iframe",{
+				id:"risk-overview-embed",
+				class:"looker-embed",
+				frameBorder:"0",
+				//src:"https://meta.looker.com/embed/looks/30429?"+[
+					//"embed_domain="+document.location.origin,
+					//"f[account_scoring.origin]="+document.location.origin.replace("://","...").replace(":","..")
+					//,"run=1",
+					//,"Account=<id%20...>"
+				//].join("&")
+				// ^ Slow.......
+				// v Fast!
+				src:"https://meta.looker.com/embed/explore/meta/account_scoring.html?"
+					+"&fields=account_scoring.account_name,account_scoring.total_dollars_safe,account_scoring.total_dollars_at_risk_addressable,account_scoring.total_dollars_at_risk_unaddressable,account_scoring.total_dollars_at_risk_unknown,account_scoring.link_risk_account"
+					+"&f[months.date]=1+months+ago+for+1+months"
+					+"&f[account.account_segment]=Velocity"
+					+"&f[account_scoring.origin]="+document.location.origin.replace("://","...").replace(":","..")
+					+"&sorts=account_scoring.total_dollars_at_risk_unknown+desc"
+					+"&limit=1500"
+			})
+		]),
+		h("div",{id:"risk-account",class:(s.route == "risk-account"?"frame-show":"frame-hide")},[
+			h("h3",{},"Account Risk-Safety Review"),
+			h("div", {class:"feedback"}, s.feedback.map((feedback,f) =>
+				h("div", {class:"row"},[
+					h("div",{class:"category"},[
+						h("label",{},"Type of Feedback"),
+						h("select",feedbackInput(a,s,f,"category"),[
+								option('adj-safe',"Adjust safer",feedback.category),
+								option('adj-risk',"Adjust riskier",feedback.category),
+								option('exp-safe',"Explain safety",feedback.category),
+								option('exp-risk',"Explain risk",feedback.category)
+							])
+					]),
+					h("div",{class:"strength"},[
+						h("label",{},"Strength of Feedback"),
+						h("input",{type:"range",min:"0",max:"99",list:"strength-values", ...feedbackInput(a,s,f,"strength")})
+					]),
+					h("div",{class:"subject"},[
+						h("label",{},"Feedback Subject"),
+						h("input",{type:"text", ...feedbackInput(a,s,f,"subject")})
+					]),
+					h("div",{class:"notes"},[
+						h("label",{},"Notes"),
+						h("textarea",feedbackInput(a,s,f,"notes"))
+					]),
+					h("div",{class:"wm12"},[
+						feedback.category=='exp-risk'
+						?	h("div",{class:"loeffort"},[
+								h("label",{},"Level of effort"),
+								h("input",{type:"number",min:"0",max:"99.9", ...feedbackInput(a,s,f,"loeffort")})
+							])
+						: feedback.category=='exp-safe'
+						?	h("div",{class:"strength"},[
+								h("label",{},"Monitor"),
+								h("input",{type:"text", class:"wm12", ...feedbackInput(a,s,f,"monitor")})
+							])
+						: ""
+					])
+				])
+			)),
+			h("div", {class:"embed-container"},[
+				//h("div",{class:"embed-cover"}),
+				h("iframe",{
+					id:"risk-account-embed",
 					class:"looker-embed",
 					frameBorder:"0",
-					src:"https://meta.looker.com/embed/dashboards/...?"+[
+					src:"https://meta.looker.com/embed/dashboards/2676?"+[
 						"embed_domain="+document.location.origin
 						//,"run=1",
 						//,"Account=<id%20...>"
 					].join("&")
-				})*/
+				})
 			]),
-		"risk-account":
-			h("div",{id:"risk-account"},[
-				h("h3",{},"Account Risk-Safety Review"),
-				h("div", {class:"feedback"}, s.feedback.map((feedback,f) =>
-					h("div", {class:"row"},[
-						h("div",{class:"category"},[
-							h("label",{},"Type of Feedback"),
-							h("select",feedbackInput(a,s,f,"category"),[
-									option('adj-safe',"Adjust safer",feedback.category),
-									option('adj-risk',"Adjust riskier",feedback.category),
-									option('exp-safe',"Explain safety",feedback.category),
-									option('exp-risk',"Explain risk",feedback.category)
-								])
-						]),
-						h("div",{class:"strength"},[
-							h("label",{},"Strength of Feedback"),
-							h("input",{type:"range",min:"0",max:"0.99",list:"strength-values", ...feedbackInput(a,s,f,"strength")})
-						]),
-						h("div",{class:"subject"},[
-							h("label",{},"Feedback Subject"),
-							h("input",{type:"text", ...feedbackInput(a,s,f,"subject")})
-						]),
-						h("div",{class:"notes"},[
-							h("label",{},"Notes"),
-							h("textarea",feedbackInput(a,s,f,"notes"))
-						]),
-						h("div",{class:"wm12"},[
-							feedback.category=='exp-risk'
-							?	h("div",{class:"loeffort"},[
-									h("label",{},"Level of effort"),
-									h("input",{type:"number",min:"0",max:"99.9", ...feedbackInput(a,s,f,"loeffort")})
-								])
-							: feedback.category=='exp-safe'
-							?	h("div",{class:"strength"},[
-									h("label",{},"Monitor"),
-									h("input",{type:"text", class:"wm12", ...feedbackInput(a,s,f,"monitor")})
-								])
-							: ""
-						])
-					])
-				)),
-				h("div", {},[
-					h("iframe",{
-						id:"risk-account-embed",
-						class:"looker-embed",
-						frameBorder:"0",
-						src:"https://meta.looker.com/embed/dashboards/2676?"+[
-							"embed_domain="+document.location.origin
-							//,"run=1",
-							//,"Account=<id%20...>"
-						].join("&")
-					})
-				]),
-				h("div", {class:"r"},[
-					h("button",{},"Save")
-				])
+			h("div", {class:"r"},[
+				h("button",{},"Save")
 			])
-	}[s.route || "risk-overview"]
-	|| h("h3",{},"Invalid URL")
+		])
+	])
 ])
 const actions = {
 		none: value => state => state,
 		//log: value => state => console.log(state),
 		route: v => s => (
-				s.lookerReady && v.Account != s.Account && setTimeout(run.pushFilters,0)
-				,{
+				console.log("Route: ",v),
+				console.log("State: ",s.lookerReady),
+				v.Account != s.Account && s.lookerReady['risk-account-embed'] && setTimeout(run.updateRiskAccountEmbed,0),
+				{
 					route:v.route||s.route,
 					account:v.Account||""
 				}
 			),
 		feedback: input => state => (
-				setTimeout(run.pushFilters,0)
+				//console.log("Feedback: ",input.value),
+				setTimeout(run.updateRiskAccountEmbed,0)
 				,{
 					feedback:state.feedback.map((fb,f)=>
 						f==input.dataset.feedbackNumber
@@ -204,18 +216,24 @@ const actions = {
 					)
 				}),
 		lookerReady: v => s => (
-				!s.lookerReady && setTimeout(run.pushFilters,0)
-				,{lookerReady:true}
+				console.log("State: ",s.lookerReady),
+				console.log("Ready: ",v),
+				v=="risk-overview-embed" && !s.lookerReady['risk-overview-embed'] &&  setTimeout(run.updateRiskOverviewEmbed,0),
+				v=="risk-account-embed" && !s.lookerReady['risk-account-embed'] && setTimeout(run.updateRiskAccountEmbed,0),
+				{lookerReady:{...s.lookerReady, [v]:true}}
 			),
-		pushFilters: v => s => iframeFilterAndRun("risk-account-embed", s.feedback.reduce((accum,feedback,f)=>({
+		updateRiskAccountEmbed: v => s => ( console.log("updateRiskAccountEmbed"),
+			iframeFilterAndRun("risk-account-embed", s.feedback.reduce((accum,feedback,f)=>({
 				...accum,
 				["feedback_"+(1+f)+"_category"]:feedback.category,
-				["feedback_"+(1+f)+"_strength"]:feedback.strength,
+				["feedback_"+(1+f)+"_strength"]:feedback.strength/100,
 				["feedback_"+(1+f)+"_loeffort"]:feedback.loeffort
 			}),{
-				Account:" <id: "+s.account+">",
+				Account:"x <id "+s.account+">",
 				loeffort_threshhold:8
-			})),
+			}))
+		),
+		updateRiskOverviewEmbed: v => s => iframeFilterAndRun("risk-overview-embed", {}),
 		flash: v => s => (
 				setTimeout(run.none,5000)
 				,{flash:s.flash.slice(-10).concat(v)}
@@ -235,9 +253,12 @@ ws.onclose = () => console.info('WebSocket connection closed')
 
 window.addEventListener("message",function(event){
 		if(event.origin!=="https://meta.looker.com"){return;}
+
+		var ifr = getIframeByWindow(event.source)
+		if(!ifr || !ifr.id){return;}
 		var data = tryJsonParse(event.data)
-		console.log("Top-window message received from "+event.origin,data||event)
-		if(data.type=="dashboard:filters:changed"){run.lookerReady()}
+		console.log("Message from "+event.origin+" via iframe#"+ifr.id,data&&data.type||data||event)
+		if(data.type=="dashboard:filters:changed"){run.lookerReady(ifr.id)}
 	})
 ws.addEventListener('message', function (event) {
 		var data = tryJsonParse(event.data)
@@ -266,15 +287,18 @@ function option(val,label,selected){
 		return h("option",{value:val,selected:selected==val||undefined},label)
 	}
 function iframeFilterAndRun(ifr,filter){
-		console.info("Updating filters:",filter)
+		console.info("Updating filters in iframe#"+ifr,filter)
 		document.getElementById(ifr).contentWindow.postMessage(JSON.stringify({
 				"type": "dashboard:filters:update",
 				"filters": filter
 			}),"https://meta.looker.com")
 		document.getElementById(ifr).contentWindow.postMessage(JSON.stringify({"type": "dashboard:run"}),"https://meta.looker.com")
 	}
-
-
+function getIframeByWindow(w){
+		return [...document.getElementsByTagName("iframe")].filter(
+			f=>f.contentWindow === w
+		)[0]
+	}
 
 
 
@@ -298,6 +322,12 @@ function tryJsonParse(s){try{return JSON.parse(s)}catch(e){return undefined}}
 function handleHashState(){console.warn("TODO")}
 </script>
 <style type="text/css">
+	.frame-display {position:relative;top:0;left:0;width:100vw}
+	.frame-display>div {position:absolute;top:0;width:96vw;}
+	.frame-display>div.frame-hide {left:-9999px}
+	.frame-display>div.frame-show {left:1vw}
+	#risk-account-embed {min-height:80vh;margin-top:-3.2em}
+	.embed-container{overflow: hidden;}
 	.row {display: flex; flex-direction: row; justify-content: space-around;}
 	label {display:block;font-size:0.6em;font-size:0.6em; color:#666;}
 	.feedback>.row {background-color:#fff;border:1px solid #999;border-radius:0.25em;padding:0.25em 2em;margin:15px	0;box-shadow: 3px 3px 10px #999;}
