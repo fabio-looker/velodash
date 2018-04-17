@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script>var session = requireSession({
+			idpAuthorizeUrl: (state)=>("https://login.microsoftonline.com/d218a038-fce6-4d24-b555-da29bdb61480/oauth2/authorize?response_type=token&scope=openid&resource=94072ca3-e58d-4bfc-a0c8-63fddd45d15c&client_id=94072ca3-e58d-4bfc-a0c8-63fddd45d15c&redirect_uri="+encodeURIComponent(location.origin+"/")+"&state="+encodeURIComponent(state))
+		})
+	function requireSession({idpAuthorizeUrl,reset, s=localStorage}){
+			if(reset){clearSession()}
+			var hash = urlToObj(window.location.hash)
+			if(isAuthenticating(hash)){
+					if(isExpected(hash)){setSession(hash)}
+					else{console.warn("Unexpected authorization attempt.")}
+					location.hash = ''
+				}
+			if(hasSession()){return getSession()}
+			location = idpAuthorizeUrl(setExpectation())
+			return {}
+			
+			function isAuthenticating(hash){
+					return !!hash.access_token
+				}
+			function setExpectation(){
+					var arr = new Uint16Array(10);
+					window.crypto.getRandomValues(arr);
+					var str=''
+					for (var i = 0; i < arr.length; i++) {str+=arr[i].toString(16)}
+					s.setItem("oauthState",str)
+					return str
+				}
+			function isExpected(hash){
+					return hash.state == s.getItem("oauthState")
+				}
+			function setSession(hash) {
+					s.setItem('access_token', hash.access_token)
+					s.setItem('id_token', hash.id_token)
+					s.setItem('expires_at', JSON.stringify(
+							hash.expires_in * 1000 + new Date().getTime()
+						))
+				}
+			function clearSession() {
+					s.removeItem('access_token');
+					s.removeItem('id_token');
+					s.removeItem('expires_at');
+				}
+			function getSession() { return {
+					accessToken:s.getItem('access_token'),
+					idToken:s.getItem('id_token'),
+					expiresAt:s.getItem('expires_at')
+				}}
+			function hasSession() {
+					return new Date().getTime() < JSON.parse(s.getItem('expires_at'))
+				}
+		}
+function urlToObj(str){
+		return (str.match(/[^?#].+/)||[''])[0].split('&').filter(Boolean).map(ss=>ss.split('='))
+		.reduce((aa,a)=>({[decodeURIComponent(a[0])]:decodeURIComponent(a.slice(1).join('=')), ...aa}),{})
+	}
+</script>
+<script>
+var ws = new WebSocket(
+		`ws://${location.host}/?token=`
+		+encodeURIComponent(session.accessToken)
+	)
+ws.onerror = (e) => console.error('WebSocket error ',e)
+ws.onopen = () => console.info('WebSocket connection established')
+ws.onclose = () => console.info('WebSocket connection closed')
+ws.addEventListener('message', function (event) {
+	var o = tryJsonParse(event.data)
+	console.log('%cWS⇩','color:green', o || event.data)
+})
+function wsapi(data){
+	console.log('%cWS⇧','color:darkblue', data)
+	return ws.send(JSON.stringify(data))
+}
+function tryJsonParse(s){try{return JSON.parse(s)}catch(e){return undefined}}
+
+console.info("Use `wsapi(o)` to send data to the socket")
+</script>
+</head>
+<body>
+	<p>Use console</p>
+</body>
+</html>
