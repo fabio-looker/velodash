@@ -81,6 +81,8 @@ async function verifyClient ({req},verificationDone){
 async function websocketConnection(ws, req) {
 		ws.send("Connect success")
 		ws.on('message', async msgStr => {try{
+				var data = JSON.parse(msgStr)
+				
 				ws.send(JSON.stringify({st:"info",msg:"WS Response"}))
 			}catch(err){
 				ws.send(JSON.stringify(err)) //TODO clean up

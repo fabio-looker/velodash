@@ -95,126 +95,142 @@ const {h,app} = hyperapp
 const state = {
 	route:"",
 	flash:[],
-	feedback:[{category:"adj-safe",strength:0.25},{category:"adj-safe",strength:0}],
+	//feedback:[{category:"adj-safe",strength:0},{category:"adj-safe",strength:0}],
 	lookerReady:{},
-	account:"foo"
+	account:"",
+	accounts:{}
 }
+const defaultFeedback = {category:"adj-safe",strength:0}
 const view = (s,a) =>
 h("div",{},[
 	h("ul",{id:"flash"},s.flash
 			//.filter(flash=>flash.time>Date.now()-5)
 			.map(flash=>h("li",{class:"st-"+flash.st},flash.msg))
 		),
-	h("div",{id:"breadcrumb"},[
-		h("a",{href:"#/risk-overview"},"Risk Overview")
-	]),
-	h("div",{class:"frame-display"},[
-		h("div",{id:"route-risk-overview",class:((!s.route||s.route == "risk-overview")?"frame-show":"frame-hide")},[
-			// ^ Because https://github.com/looker/helltool/issues/34763
-			h("a",{href:"#/risk-account&Account=123"},"Account A"),
-			h("a",{href:"#/risk-account&Account=456"},"Account B"),
-			h("iframe",{
-				id:"risk-overview-embed",
-				class:"looker-embed",
-				frameBorder:"0",
-				//src:"https://meta.looker.com/embed/looks/30429?"+[
-					//"embed_domain="+document.location.origin,
-					//"f[account_scoring.origin]="+document.location.origin.replace("://","...").replace(":","..")
-					//,"run=1",
-					//,"Account=<id%20...>"
-				//].join("&")
-				// ^ Slow.......
-				// v Fast!
-				src:"https://meta.looker.com/embed/explore/meta/account_scoring.html?"
-					+"&fields=account_scoring.account_name,account_scoring.total_dollars_safe,account_scoring.total_dollars_at_risk_addressable,account_scoring.total_dollars_at_risk_unaddressable,account_scoring.total_dollars_at_risk_unknown,account_scoring.link_risk_account"
-					+"&f[months.date]=1+months+ago+for+1+months"
-					+"&f[account.account_segment]=Velocity"
-					+"&f[account_scoring.origin]="+document.location.origin.replace("://","...").replace(":","..")
-					+"&sorts=account_scoring.total_dollars_at_risk_unknown+desc"
-					+"&limit=1500"
-			})
-		]),
-		h("div",{id:"risk-account",class:(s.route == "risk-account"?"frame-show":"frame-hide")},[
-			h("h3",{},"Account Risk-Safety Review"),
-			h("div", {class:"feedback"}, s.feedback.map((feedback,f) =>
-				h("div", {class:"row"},[
-					h("div",{class:"category"},[
-						h("label",{},"Type of Feedback"),
-						h("select",feedbackInput(a,s,f,"category"),[
-								option('adj-safe',"Adjust safer",feedback.category),
-								option('adj-risk',"Adjust riskier",feedback.category),
-								option('exp-safe',"Explain safety",feedback.category),
-								option('exp-risk',"Explain risk",feedback.category)
-							])
-					]),
-					h("div",{class:"strength"},[
-						h("label",{},"Strength of Feedback"),
-						h("input",{type:"range",min:"0",max:"99",list:"strength-values", ...feedbackInput(a,s,f,"strength")})
-					]),
-					h("div",{class:"subject"},[
-						h("label",{},"Feedback Subject"),
-						h("input",{type:"text", ...feedbackInput(a,s,f,"subject")})
-					]),
-					h("div",{class:"notes"},[
-						h("label",{},"Notes"),
-						h("textarea",feedbackInput(a,s,f,"notes"))
-					]),
-					h("div",{class:"wm12"},[
-						feedback.category=='exp-risk'
-						?	h("div",{class:"loeffort"},[
-								h("label",{},"Level of effort"),
-								h("input",{type:"number",min:"0",max:"99.9", ...feedbackInput(a,s,f,"loeffort")})
-							])
-						: feedback.category=='exp-safe'
-						?	h("div",{class:"strength"},[
-								h("label",{},"Monitor"),
-								h("input",{type:"text", class:"wm12", ...feedbackInput(a,s,f,"monitor")})
-							])
-						: ""
-					])
-				])
-			)),
-			h("div", {class:"embed-container"},[
-				//h("div",{class:"embed-cover"}),
+	h("div",{id:"main"},[
+		h("h2",{id:"header"},"Velocity Dash"),
+		h("div",{id:"nav",class:"row"},[
+				h("a",{class:"dis", href:"#"},"Velocity Overview (TBD)"),
+				h("a",{href:"#/risk-overview"},"Risk Categorization (CDR)"),
+				h("a",{class:"dis",href:"#"},"Risk Mitigation (SWAT)"),
+				h("a",{class:"dis",href:"#"},"Opp Categorization (CDR)"),
+				h("a",{class:"dis",href:"#"},"Opp Nurture (CDR?AE?)")
+			]),
+		h("div",{id:"pane-container"},[
+			h("div",{id:"pane-risk-overview",class:((!s.route||s.route == "risk-overview")?"focus":"unfocus")},[
+				// ^ Because https://github.com/looker/helltool/issues/34763
 				h("iframe",{
-					id:"risk-account-embed",
+					id:"risk-overview-embed",
 					class:"looker-embed",
 					frameBorder:"0",
-					src:"https://meta.looker.com/embed/dashboards/2676?"+[
-						"embed_domain="+document.location.origin
+					//src:"https://meta.looker.com/embed/looks/30429?"+[
+						//"embed_domain="+document.location.origin,
+						//"f[account_scoring.origin]="+document.location.origin.replace("://","...").replace(":","..")
 						//,"run=1",
 						//,"Account=<id%20...>"
-					].join("&")
+					//].join("&")
+					// ^ Slow.......
+					// v Fast!
+					src:"https://meta.looker.com/embed/explore/gCMquLuGLZAAkPxsNtUImr.html"
+						+"?apply_formatting=true"
+						+"&apply_vis=true"
+						+"&f[account_scoring.origin]="+document.location.origin.replace("://","...").replace(":","..")
+						+"&sorts=account_scoring.total_dollars_at_risk_unknown+desc"
+						+"&limit=1500"
 				})
 			]),
-			h("div", {class:"r"},[
-				h("button",{},"Save")
+			h("div",{id:"pane-risk-account",class:(s.route == "risk-account"?"focus":"unfocus")},[
+				//h("a",{class:"closer",href:"#/risk-overview"},"\u274c"),
+				h("div", {class:"feedback"}, s.accounts[s.account].feedback.map((feedback,f) =>
+						h("div", {class:"row"},[
+							h("div",{class:"category"},[
+								h("label",{},"Type of Feedback"),
+								h("select",feedbackInput(a,s,f,"category"),[
+										option('adj-safe',"Adjust safer",feedback.category),
+										option('adj-risk',"Adjust riskier",feedback.category),
+										option('exp-safe',"Explain safety",feedback.category),
+										option('exp-risk',"Explain risk",feedback.category)
+									])
+							]),
+							h("div",{class:"strength"},[
+								h("label",{},"Strength of Feedback"),
+								h("input",{type:"range",min:"0",max:"99",list:"strength-values", ...feedbackInput(a,s,f,"strength")})
+							]),
+							h("div",{class:"subject"},[
+								h("label",{},"Feedback Subject"),
+								h("input",{type:"text", ...feedbackInput(a,s,f,"subject")})
+							]),
+							h("div",{class:"notes"},[
+								h("label",{},"Notes"),
+								h("textarea",feedbackInput(a,s,f,"notes"))
+							]),
+							h("div",{class:"wm12"},[
+								feedback.category=='exp-risk'
+								?	h("div",{class:"loeffort"},[
+										h("label",{},"Level of effort"),
+										h("input",{type:"number",min:"0",max:"99.9", ...feedbackInput(a,s,f,"loeffort")})
+									])
+								: feedback.category=='exp-safe'
+								?	h("div",{class:"strength"},[
+										h("label",{},"Monitor"),
+										h("input",{type:"text", class:"wm12", ...feedbackInput(a,s,f,"monitor")})
+									])
+								: ""
+							])
+						])
+					).concat(s.accounts[s.account].feedback.length<2
+						?h("div", {class:"row pointer", onclick:()=>a.addFeedback(s.account)}, "+")
+						:[]
+					)
+				),
+				h("div", {class:"embed-container"},[
+					//h("div",{class:"embed-cover"}),
+					h("iframe",{
+						id:"risk-account-embed",
+						class:"looker-embed",
+						frameBorder:"0",
+						src:"https://meta.looker.com/embed/dashboards/2676?"+[
+							"embed_domain="+document.location.origin
+							//,"run=1",
+							//,"Account=<id%20...>"
+						].join("&")
+					})
+				]),
+				h("div", {class:"bottom-bar r"},[
+					h("button",{},"Save")
+				])
 			])
 		])
 	])
 ])
 const actions = {
-		none: value => state => state,
-		//log: value => state => console.log(state),
+		state: value => state => state,
 		route: v => s => (
 				console.log("Route: ",v),
 				console.log("State: ",s.lookerReady),
 				v.Account != s.Account && s.lookerReady['risk-account-embed'] && setTimeout(run.updateRiskAccountEmbed,0),
 				{
 					route:v.route||s.route,
-					account:v.Account||""
+					account:v.Account||"",
+					accounts:{[v.Account||""]:{feedback:[defaultFeedback]}, ...s.accounts}
 				}
 			),
-		feedback: input => state => (
+		addFeedback: v => s => ({accounts:{
+				...s.accounts,
+				[s.account]:{...s.accounts[s.account], feedback:s.accounts[s.account].feedback.concat(defaultFeedback)}
+			}}),
+		feedback: input => s => (
 				//console.log("Feedback: ",input.value),
 				setTimeout(run.updateRiskAccountEmbed,0)
-				,{
-					feedback:state.feedback.map((fb,f)=>
-						f==input.dataset.feedbackNumber
-						?{...fb, [input.dataset.feedbackAttribute]:input.value}
-						:fb
-					)
-				}),
+				,{accounts:{...s.accounts,
+					[s.account]:{...s.accounts[s.account],
+					feedback:s.accounts[s.account].feedback.map((fb,f)=>
+							f==input.dataset.feedbackNumber
+							?{...fb, [input.dataset.feedbackAttribute]:input.value}
+							:fb
+						)
+					}
+				}}),
 		lookerReady: v => s => (
 				console.log("State: ",s.lookerReady),
 				console.log("Ready: ",v),
@@ -223,7 +239,7 @@ const actions = {
 				{lookerReady:{...s.lookerReady, [v]:true}}
 			),
 		updateRiskAccountEmbed: v => s => ( console.log("updateRiskAccountEmbed"),
-			iframeFilterAndRun("risk-account-embed", s.feedback.reduce((accum,feedback,f)=>({
+			iframeFilterAndRun("risk-account-embed", s.accounts[s.account].feedback.reduce((accum,feedback,f)=>({ //TODO only update filters if certain attributes changes, not subject/notes
 				...accum,
 				["feedback_"+(1+f)+"_category"]:feedback.category,
 				["feedback_"+(1+f)+"_strength"]:feedback.strength/100,
@@ -278,7 +294,7 @@ window.addEventListener('hashchange',function(event){
 function feedbackInput(actions,state,number,attribute){return {
 			"data-feedback-number":number,
 			"data-feedback-attribute":attribute,
-			value:state.feedback[number][attribute],
+			value:state.accounts[state.account].feedback[number][attribute],
 			onchange:evt=>actions.feedback(evt.target)
 		}}
 
@@ -322,11 +338,27 @@ function tryJsonParse(s){try{return JSON.parse(s)}catch(e){return undefined}}
 function handleHashState(){console.warn("TODO")}
 </script>
 <style type="text/css">
-	.frame-display {position:relative;top:0;left:0;width:100vw}
-	.frame-display>div {position:absolute;top:0;width:96vw;}
-	.frame-display>div.frame-hide {left:-9999px}
-	.frame-display>div.frame-show {left:1vw}
-	#risk-account-embed {min-height:80vh;margin-top:-3.2em}
+	h2{font-family:sans-serif;color:#666;text-align: center}
+	body{margin: 0;overflow: hidden;}
+	a.dis{color:#999;cursor:default;}
+	#app{margin:0;height:100vh;}
+	#main{height:100%;display: flex; flex-direction: column;}
+	#header{}
+	#pane-container {height:100%;display:flex;flex-direction: row}
+	#pane-container>div {height:100%;position:relative;top:0;left:0;}
+	#pane-risk-overview {min-width:480px;width:20%}
+		#pane-risk-overview.focus{}
+		#pane-risk-overview.unfocus{}
+		#pane-risk-overview iframe {height:100%;}
+		#pane-risk-overview.unfocus iframe {}
+	#pane-risk-account {min-width:720px;width:80%;display:flex;flex-direction: column;min-height:600px}
+		#pane-risk-account.focus {visibility: visible;}
+		#pane-risk-account.unfocus {visibility: collapse;}
+			#pane-risk-account>.feedback {flex:0 0 content;}
+			#pane-risk-account>.embed-container {flex:1}
+			#pane-risk-account>.bottom-bar {flex:0 0 auto;height:2em;}
+		#pane-risk-account iframe {height:100%;margin-top:-3.2em}
+	/*.closer{text-decoration:none;position:absolute;top:0;right:0;padding:0.75em;text-align: center;border-radius: 1.25em;background-color:#ccc;color:#666; }*/
 	.embed-container{overflow: hidden;}
 	.row {display: flex; flex-direction: row; justify-content: space-around;}
 	label {display:block;font-size:0.6em;font-size:0.6em; color:#666;}
@@ -342,6 +374,7 @@ function handleHashState(){console.warn("TODO")}
 	.st-undefined {color:#444;background-color:#ddd;border-color:#633;}
 	.r {text-align:right;right:0}
 	.looker-embed{height:36em;width:100%}
-	.wm12 {width:12em;}
+	.wm12 {width:12em}
+	.pointer {cursor: pointer;}
 </style>
 </html>
