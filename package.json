@@ -16,5 +16,13 @@
     "pg": "^7.4.1",
     "promisify-node": "^0.4.0",
     "ws": "^5.1.1"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fabio-looker/velodash.git"
+  },
+  "bugs": {
+    "url": "https://github.com/fabio-looker/velodash/issues"
+  },
+  "homepage": "https://github.com/fabio-looker/velodash#readme"
 }

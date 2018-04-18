@@ -1,0 +1,41 @@
+
+
+<script>
+function getSocratesString(feedback){
+	var id = 
+	return (state.accounts[state.account].feedback
+			.filter(fb=>~['adj-safe','exp-safe','adj-risk','exp-risk'].indexOf(fb.category))
+			.map((fb,f) =>
+				'-'
+				+(		fb.category == 'adj-safe' ?'s'
+						:fb.category == 'exp-safe' ?'s'
+						:fb.category == 'adj-risk' ?'r'
+						:fb.category == 'exp-risk' && fb.loeffort === '' ?'r'
+						:fb.category == 'exp-risk' && fb.loeffort !== ''?'c'
+						:''
+					)
+				+' '
+				+fb.title.replace(/ - |\n/g,' _ ')+' #'+state.account+"-"+Math.random().toString(16).slice(2,10)
+				+' - '
+				+risk.note.replace(/\n/g,' ').slice(0,2000)
+				+" "
+				+fb.category+":"((parseInt(fb.strength)||0)/100).toString(10).slice(0,5)
+				+((fb.loeffort!==undefined && fb.loeffort!=='')
+						?' loeffort:'+f.loeffort
+						:''
+					)
+			)
+			.join("\n")
+		);
+	if(!~['adj','exp'].indexOf(feedback.category)){return ""}
+	const socr = feedback.category
+	const feedbackTag = feedback.category
+	const loeffortTag
+}
+function getSfNoteLink(state){
+	return "..."
+		+ state.account
+		+ "?...="
+		+ encodeURIComponent(getSocratesString(state))
+}
+</script>
