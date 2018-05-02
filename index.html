@@ -89,7 +89,8 @@ h("div",{},[
 							+`&vis=%7B%22type%22%3A%22table%22%2C%22show_view_names%22%3Afalse%2C%22show_row_numbers%22%3Afalse%2C%22table_theme%22%3A%22gray%22%2C%22limit_displayed_rows%22%3Afalse%2C%22series_labels%22%3A%7B%22account_scoring.link_risk_account%22%3A%22Feedback%22%2C%22account_scoring.account_name%22%3A%22Account%22%2C%22account_scoring.total_dollars_at_risk_unknown%22%3A%22%24+at+Risk+-+Unknown%22%7D%7D`
 							+"&apply_formatting=true"
 							+"&apply_vis=true"
-							+"&f[account_scoring.origin]="+document.location.origin.replace("://","...").replace(":","..")
+							+"&f[account_scoring.origin]="
+								+(document.location.origin+document.location.path).replace("/","..").replace(":","._")
 							+"&sorts=account_scoring.total_dollars_at_risk_unknown+desc"
 							+"&limit=1500"
 					})
