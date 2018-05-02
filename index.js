@@ -1,6 +1,6 @@
 const promisify = require("promisify-node");
-const express = require('express')
-const path = require('path')
+const express=require('express')
+const path=require('path')
 const _jwt = require('jsonwebtoken')
 const jwt = {
 		verify: promisify(_jwt.verify),
@@ -15,7 +15,7 @@ require('events').EventEmitter.defaultMaxListeners = 15 // Otherwise node warns 
 const pg = require('pg')
 const WebSocketServer = require('ws').Server
 
-const app = express()
+const app=express()
 const config = {
 		port:3000,
 		env: process.env.NODE_ENV || "dev",
@@ -47,7 +47,7 @@ const pIdpPublicPemsByKid = fetch(config.idpPublicKeyUrl)
 
 		return;
 
-
+		
 	}()
 
 
@@ -81,8 +81,6 @@ async function verifyClient ({req},verificationDone){
 async function websocketConnection(ws, req) {
 		ws.send("Connect success")
 		ws.on('message', async msgStr => {try{
-				var data = JSON.parse(msgStr)
-				
 				ws.send(JSON.stringify({st:"info",msg:"WS Response"}))
 			}catch(err){
 				ws.send(JSON.stringify(err)) //TODO clean up
@@ -97,3 +95,4 @@ function errorHandler (err, req, res, next) {
 				trace:(cfg.env=='dev' && err.stack ? err.stack.split("\n") : undefined)
 			})
 	}
+

@@ -1,6 +1,74 @@
 <!DOCTYPE html>
 <html>
 <head>
+<!--
+
+	https://login.microsoftonline.com/d218a038-fce6-4d24-b555-da29bdb61480/oauth2/authorize?response_type=token&scope=openid&resource=94072ca3-e58d-4bfc-a0c8-63fddd45d15c&client_id=94072ca3-e58d-4bfc-a0c8-63fddd45d15c&redirect_uri=http%3A%2F%2Flocalhost%3A9090%2F&state=1234
+
+	https://login.microsoftonline.com/d218a038-fce6-4d24-b555-da29bdb61480/.well-known/openid-configuration
+
+-->
+<script>var session = requireSession({
+			idpAuthorizeUrl: (state)=>("https://login.microsoftonline.com/d218a038-fce6-4d24-b555-da29bdb61480/oauth2/authorize?response_type=token&scope=openid&resource=94072ca3-e58d-4bfc-a0c8-63fddd45d15c&client_id=94072ca3-e58d-4bfc-a0c8-63fddd45d15c&redirect_uri="+encodeURIComponent(location.origin+"/")+"&state="+encodeURIComponent(state))
+		})
+	function requireSession({idpAuthorizeUrl,reset, s=localStorage}){
+			if(reset){clearSession()}
+			var hash = getHashObj()
+			if(isAuthenticating(hash)){
+					if(isExpected(hash)){setSession(hash)}
+					else{console.warn("Unexpected authorization attempt.")}
+					location.hash = ''
+				}
+			if(hasSession()){return getSession()}
+			location = idpAuthorizeUrl(setExpectation())
+			return {}
+
+			function isAuthenticating(hash){
+					return !!hash.access_token
+				}
+			function setExpectation(){
+					var arr = new Uint16Array(10);
+					window.crypto.getRandomValues(arr);
+					var str=''
+					for (var i = 0; i < arr.length; i++) {str+=arr[i].toString(16)}
+					s.setItem("oauthState",str) //TODO: Save prior hash path to state-keyed localstorage & restore upon callback
+					return str
+				}
+			function isExpected(hash){
+					return hash.state == s.getItem("oauthState")
+				}
+			function setSession(hash) {
+					s.setItem('access_token', hash.access_token)
+					s.setItem('id_token', hash.id_token)
+					s.setItem('expires_at', JSON.stringify(
+							hash.expires_in * 1000 + new Date().getTime()
+						))
+				}
+			function clearSession() {
+					s.removeItem('access_token');
+					s.removeItem('id_token');
+					s.removeItem('expires_at');
+				}
+			function getSession() { return {
+					accessToken:s.getItem('access_token'),
+					idToken:s.getItem('id_token'),
+					expiresAt:s.getItem('expires_at')
+				}}
+			function hasSession() {
+					return new Date().getTime() < JSON.parse(s.getItem('expires_at'))
+				}
+		}
+function getHashObj(){
+		return (location.hash
+				.slice(1)
+				.split('&')
+				.filter(Boolean)
+				.map(ss=>ss.replace(/^\//,"route="))
+				.map(ss=>ss.split('='))
+				.reduce((aa,a)=>({[decodeURIComponent(a[0])]:decodeURIComponent(a.slice(1).join('=')), ...aa}),{})
+			);
+	}
+</script>
 </head>
 <body style="color:#333;background-color:#eee">
 	<div id="app"></div>
@@ -40,11 +108,6 @@ h("div",{},[
 			.map(flash=>h("li",{class:"st-"+flash.st},flash.msg))
 		),
 	h("div",{id:"main"},[
-		h("div",{id:"session-banner",class:"st-info c "+(Object.keys(s.lookerReady).length?"unfocus":"focus")},[
-				"An active session on meta is required. If you are not logged in, please ",
-				h("a",{target:"meta",href:"https://meta.looker.com/"},"log in"),
-				"."
-			]),
 		h("h2",{id:"header"},"Velocity Dash"),
 		h("div",{id:"nav",class:"row tab-row"},[
 				h("a",{href:"#/velocity-overview", class:((!s.route||s.route == "velocity-overview")?"focus":"unfocus")},
@@ -53,7 +116,7 @@ h("div",{},[
 				h("a",{href:"#/risk", class:((s.route == "risk")?"focus":"unfocus")},
 					"Risk Categorization (CDR)"
 				),
-				h("a",{href:"#/swat"},"Risk Mitigation (SWAT)"),
+				h("a",{class:"dis",href:"#"},"Risk Mitigation (SWAT)"),
 				h("a",{class:"dis",href:"#"},"Opp Categorization (CDR)"),
 				h("a",{class:"dis",href:"#"},"Opp Nurture (CDR?AE?)")
 			]),
@@ -152,27 +215,12 @@ h("div",{},[
 						})
 					]),
 					h("div", {class:"bottom-bar r"},[
-						h("a",{
-								class:"submit "+(s.accounts[s.account].feedback.some(fb=>fb.strength)?"focus":"unfocus"),
-								target:"_blank",
-								href:getSfNoteLink(s)
-							},
+						h("button",{class:"submit "+(s.accounts[s.account].feedback.some(fb=>fb.strength)?"focus":"unfocus")},
 							"Save..."
 						)
 					])
 				])
-			]),
-			h("div",{class:((s.route == "swat")?"focus":"unfocus")+" tab-contents"},[
-				h("div",{class:"embed-container"},[
-					h("h3",{class:"cover"},"SWAT Dashboard"),
-					h("iframe",{
-						id:"swat-dashboard-embed",
-						class:"looker-embed",
-						frameBorder:"0",
-						src:"https://meta.looker.com/embed/dashboards/2702"
-					})
-				])
-			]),
+			])
 		])
 	])
 ])
@@ -213,11 +261,11 @@ const actions = {
 				{lookerReady:{...s.lookerReady, [v]:true}}
 			),
 		updateRiskAccountEmbed: v => s => ( console.log("updateRiskAccountEmbed"),
-			iframeFilterAndRun("risk-account-embed", s.accounts[s.account].feedback.reduce((accum,fb,f)=>({ //TODO only update filters if certain attributes changes, not subject/notes
+			iframeFilterAndRun("risk-account-embed", s.accounts[s.account].feedback.reduce((accum,feedback,f)=>({ //TODO only update filters if certain attributes changes, not subject/notes
 				...accum,
-				["feedback_"+(1+f)+"_category"]:fb.category.slice(0,3),
-				["feedback_"+(1+f)+"_strength"]:fb.strength/100 * ((fb.category=='adj-risk'||fb.category=='exp-safe')?-1:1),
-				["feedback_"+(1+f)+"_loeffort"]:fb.loeffort
+				["feedback_"+(1+f)+"_category"]:feedback.category,
+				["feedback_"+(1+f)+"_strength"]:feedback.strength/100,
+				["feedback_"+(1+f)+"_loeffort"]:feedback.loeffort
 			}),{
 				Account:"x <id "+s.account+">",
 				loeffort_threshhold:8
@@ -233,6 +281,24 @@ const actions = {
 
 const run = app(state,actions,view,document.body)
 run.route(getHashObj())
+/*
+const ws = new WebSocket(
+		`ws://${location.host}/?token=`
+		+encodeURIComponent(session.accessToken)
+	)
+ws.onerror = () => console.error('WebSocket error')
+ws.onopen = () => console.info('WebSocket connection established')
+ws.onclose = () => console.info('WebSocket connection closed')
+
+
+ws.addEventListener('message', function (event) {
+		var data = tryJsonParse(event.data)
+		if( data && data.msg){
+				run.flash(data.msg)
+			}
+		console.log('WS:', event.data);
+	})
+*/
 
 window.addEventListener("message",function(event){
 		if(event.origin!=="https://meta.looker.com"){return;}
@@ -256,16 +322,7 @@ function feedbackInput(actions,state,number,attribute){return {
 			onchange:evt=>actions.feedback(evt.target)
 		}}
 
-function getHashObj(){
-		return (location.hash
-				.slice(1)
-				.split('&')
-				.filter(Boolean)
-				.map(ss=>ss.replace(/^\//,"route="))
-				.map(ss=>ss.split('='))
-				.reduce((aa,a)=>({[decodeURIComponent(a[0])]:decodeURIComponent(a.slice(1).join('=')), ...aa}),{})
-			);
-	}
+
 function option(val,label,selected){
 		return h("option",{value:val,selected:selected==val||undefined},label)
 	}
@@ -289,58 +346,12 @@ function wsapi(data){return ws.send(JSON.stringify(data))}
 
 function tryJsonParse(s){try{return JSON.parse(s)}catch(e){return undefined}}
 
-function getSocratesString(state){
-	var Y = (new Date()).getFullYear()
-	var M = (new Date()).getMonth()
-	return (state.accounts[state.account].feedback
-			.filter(fb=>~['adj-safe','exp-safe','adj-risk','exp-risk'].indexOf(fb.category))
-			.map((fb,f) =>
-				'-'
-				+(		fb.category == 'adj-safe' ?'s'
-						:fb.category == 'exp-safe' ?'s'
-						:fb.category == 'adj-risk' ?'r'
-						:fb.category == 'exp-risk' && !fb.loeffort ?'r'
-						:fb.category == 'exp-risk' && fb.loeffort  ?'c'
-						:''
-					)
-				+' '
-				+(fb.subject||'').replace(/ - |\n/g,' _ ')
-				+' - '
-				+(fb.notes||'').replace(/\n/g,' ').slice(0,2000)
-				+" "
-				+fb.category.slice(0,3)
-					+":"
-					+( ((fb.category=='adj-risk'||fb.category=='exp-safe')?-1:1)
-					  *(parseInt(fb.strength)||0)/100
-					).toString(10).slice(0,5)
-				+((fb.loeffort!==undefined && fb.loeffort!=='')
-						?' loeffort:'+fb.loeffort
-						:''
-					)
-				+' id:'+state.account+"-"+Math.random().toString(16).slice(2,10)
-				+' start:'+Y+'-'+('0'+M).slice(-2)+'-01'
-				+' end:'+(1+Y)+'-'+('0'+M).slice(-2)+'-01'
-			)
-			.join("\n")
-		);
-}
-function getSfNoteLink(state){
-		if(!state.account){return ""}
-		let e=encodeURIComponent
-		return ("https://looker.my.salesforce.com/002/e"
-				+ "?parent_id="+e(state.account.slice(0,15))
-				+ "&retURL=%2F"+e(state.account)+"%23"+e(state.account.slice(0,15))+"_RelatedNoteList_target"
-				+ "&Title=Risk+Review"
-				+ "&Body="+e(getSocratesString(state))
-			);
-	}
 </script>
 <style type="text/css">
 	h1,h2,h3{font-family:sans-serif;color:#666;text-align: center}
 	body{margin: 0;overflow: hidden;}
 	a.dis{color:#999;cursor:default;}
 	#app{margin:0;height:100vh;}
-	#session-banner.unfocus {display: none;}
 	#main{height:100%;display: flex; flex-direction: column;}
 	#header{flex:0 1;}
 	#nav{flex:none}
@@ -374,22 +385,12 @@ function getSfNoteLink(state){
 	.st-info {color:#336;background-color:#cce;border-color:#633;}
 	.st-undefined {color:#444;background-color:#ddd;border-color:#633;}
 	.r {text-align:right;right:0}
-	.c {text-align:center;}
 	.looker-embed{height:100%;width:100%}
 	.wm12 {width:12em}
 	.pointer {cursor: pointer;}
 	.bottom-bar{background-color: #fff; padding-right:2em;}
-	.submit {
-		font-size: 0.8em;
-		display: inline-block;
-		border-radius: 0.25em;
-		width: 12em;
-		padding: 0.2em 0;
-		font-family: arial;
-		text-decoration: none;
-		text-align: center;
-	}
+	.submit {height: 2.5em;border-radius: 0.25em;width: 12em;}
 	.submit.focus {cursor:pointer;color:#fff;background-color: #659;border: 1px solid #426;}
-	.submit.unfocus{cursor:default;color:#999;background-color:#ddd;border:1px solid #999;}
+	.submit.unfocus{cursor:default;color:#999;background-color:#ddd;border:1px solix #999;}
 </style>
 </html>
